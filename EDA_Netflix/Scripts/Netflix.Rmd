@@ -1,0 +1,415 @@
+---
+title: "Netflix"
+author: "Ing. José Miguel Pereira"
+date: "23/1/2022"
+output: word_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# Show de Netflixs
+
+Se posee la información de 1000 ejemplos de shows que posee la
+plataforma de Netflix.
+
+Las variables que se poseen de la misma base son:
+
+-   Puntuación de calificación de usuario (User Rating Score)
+
+-   Calificación de descripción (Rating Description)
+
+-   Información Técnica:
+
+    -   Año de lanzamiento (Release Year)
+
+    -   Título (Title)
+
+# Tabla de contenido:
+
+1.  Librerías
+
+2.  Data
+
+3.  Manipulación de datos y resumen
+
+4.  Correlación
+
+5.  Visualización
+
+# 1. Librerías
+
+Se procede a importar las librerías a emplear para el procesamiento y
+visualización de los datos.
+
+```{r Librerias, include=T,message=F, warning=F, comment=""}
+# Librerias 
+library(dplyr)
+# Gráficos
+library(ggplot2)
+# Gráficos de correlación
+library(corrplot)
+# Resumen personalizado
+library(gtsummary)
+# cluster result visualization with network diagram
+library(igraph)
+library(vioplot)
+```
+
+# 2. Data
+
+Con las librerias cargadas, se procede a cargar la base de datos.
+
+```{r Base_De_Datos, include = T, echo=F,message=F, warning=F, comment=""}
+# Data ====
+DB <- read.csv("C:\\Users/Jose/Documents/R/Projectos/Proyecto_Netflix/Data/netflix.csv")
+
+# Encabezado de la información
+head(DB)
+```
+
+Tal como se aprecia en la descripción anterior, se tienen 7 variables:
+
+-   Título
+
+-   Rating
+
+-   Rating Level
+
+-   Description del rating
+
+-   Año de aparición
+
+-   Puntaje de rating de usuario
+
+-   Tamaño del rating del usuario.
+
+# 3. Manipulación de datos y resumen
+
+Vamos a observar una breve descripción de las metricas por categoría
+
+```{r Resumen1, echo=F,message=F, warning=F, comment="",fig.align='center'}
+tbl_summary(DB[,-c(1,3)])
+```
+
+Con estos datos se puede observar más o menos como se encuentran los
+datos de la base de datos.
+
+# 4. Correlación
+
+Es importante visualizar si la información que se tiene posee un grado
+de correlación entre las variables.
+
+Primero se obtiene los datos de correlación de toda la tabla y el
+gráfico de pares.
+
+```{r Correlacion1, include = T, echo=F,fig.align='center', fig.height=8, fig.width=16,message=F, warning=F, comment=""}
+
+corr1 <- cor(DB[,4:7])
+corr1
+
+pairs(~ DB$ratingDescription+
+        DB$release.year+
+        DB$user.rating.score+
+        DB$user.rating.size)
+```
+
+Observemos la correlación de la información dentro de un gráfico más
+amigable.
+
+```{r Correlacion2,  include = T, echo=F,fig.align='center', fig.height=8, fig.width=16,message=F, warning=F, comment=""}
+corrplot(corr1,
+         method = "circle",
+         title = "Correlación" ,
+         addCoef.col = 'black',na.label = 'NA', 
+         tl.pos = 'd',
+         cl.pos = 'n')
+```
+
+Con respecto a la variable de user.rating.score se tienen valores NA, lo
+que implica que se poseen variables faltantes en esa categoría.
+
+Sin embargo, el observar los datos completos nos llevaría a tomar
+decisiones erróneas.
+
+Por lo cual, se observará la correlación existente entre las variables
+discriminando la variable user.ratinf.score.
+
+```{r corr1,  include = T, echo=F,message=F, warning=F, comment=""}
+# Matriz de correlación con casos completos
+corr2 <- cor(DB[,-c(1,2,3,6)])
+corr2
+```
+
+```{r Correlacion3,  include = T, echo=F,fig.align='center', fig.height=8, fig.width=16,message=F, warning=F, comment=""}
+corrplot(corr2,
+         method = "circle",
+         title = "Correlación" ,
+         addCoef.col = 'black',na.label = 'NA', 
+         tl.pos = 'd',
+         cl.pos = 'n')
+```
+
+Se logra apreciar la siguiente información:
+
+-   El año de lanzamiento con la descripción del rating se puede indicar
+    que poseen un porcentaje ligero de correlación positiva.
+
+-   Mientras que la descripción del rating frente al tamaño del rating
+    del usuario poseen una mínima correlación negativa.
+
+## Diagrama de Red
+
+Cada matriz de correlación se la puede visualizar como un diagrama de
+red, en donde, cada entidad de la matriz es un nodo.
+
+```{r DB2,  include = T, echo=F, message=F, warning=F, comment=""}
+DB1 <- DB[,-c(1,2,3)]
+
+```
+
+```{r Correlacion4,  include = T, echo=F,fig.align='center', fig.height=8, fig.width=16,message=F, warning=F, comment=""}
+network <- graph_from_adjacency_matrix( corr2,
+                                        weighted=T, 
+                                        mode="undirected", 
+                                        diag=F)
+par(bg="grey13", mar=c(0,1,5,1))
+set.seed(125)
+plot(network, 
+    vertex.size=12,
+    vertex.label.cex=1.2,
+    vertex.label.color="black",
+    vertex.frame.color="transparent",
+    vertex.label=LETTERS[1:3])
+title(main = list('Fig. \n Diagrama de red', cex = 2.5, font = 2),
+      sub = list('Exploración de datos \n \n \n \n', cex = 1.5),
+      col.main = 'white', col.sub = 'white',)
+
+```
+
+Donde las letras representan:
+
+```{r DB3, include=T, echo=F,message=F, warning=F, comment=""}
+# Nombres y letras
+Nombres <- names(network[1])
+comb <- cbind(Nombres,Letras = LETTERS[1:3])
+comb
+```
+
+Se logra apreciar que las variables ratingDescription y release.year
+poseen mayor relación entre ellas que con la variable user.rating.size.
+
+# 5. Visualizaciones
+
+A continuación se realizarán las agrupaciones por categorías y ver su
+comportamiento.
+
+## Rating
+
+El primer análisis gráfico realizado será a la categoría rating.
+
+```{r M1, include=T, echo=F,message=F,fig.align='center', fig.height=10, fig.width=16, warning=F, comment=""}
+# Ratings
+ratingsVars <- DB %>%
+                  select(rating)
+
+ratings <- table(ratingsVars)
+
+
+barp1 <- barplot(ratings, 
+                 ylab = list("Cantidad", cex = 1.2), 
+                 xlab = list("Rating", cex = 1.2),
+      col = ratings, ylim = c(0,300), space = 0 , width = c(rep(15, times = 13)), las = 2 )
+
+title(main = 'Fig. \n Rating',
+      sub = 'Exploración de datos',
+      col.main = 'Black', 
+      col.sub = 'blue',
+      font = 2)
+text(barp1,ratings+12, labels = ratings, size = 40)
+grid(col = "lightgray",nx = 0,ny = 12)
+```
+
+En la figura previa se observa la cantidad de elementos que se posee por
+cada rating.
+
+### Top 5 de Rating
+
+```{r M2, include=T, echo=T, echo=F,message=F, warning=F,fig.align='center', fig.height=12, fig.width=16, comment=""}
+# Top 5
+ratings1 <- data.frame(table(ratingsVars))
+ratings1 <- ratings1 %>% arrange(desc(Freq))
+ratingTop5 <- head(ratings1, n=5) 
+
+ggplot(ratingTop5, 
+       aes(x="", 
+           y=Freq, 
+           fill=ratingsVars )) +
+  geom_bar(stat="identity", width=1, color = "white") +
+  geom_label(aes(label = Freq),
+           position = position_stack(vjust = 0.5),
+           show.legend = FALSE,
+           size = 10) +
+  coord_polar("y", start=0)+
+  theme_void()+
+  theme(legend.position = "bottom",
+        text = element_text(size = 40))+ 
+  guides(fill=guide_legend(title="Rating"))
+```
+
+Entre los ratings, predomina las clasificaciones TV-14.
+
+## Release Year
+
+La segunda categoría a analizar es el año de lanzamiento.
+
+```{r M3, include=T, echo=T, echo=F,message=F,fig.align='center', fig.height=10, fig.width=16, warning=F, comment=""}
+#Release Year
+releaseYear <- DB %>%
+                  select(release.year)
+
+releaseYears <- table(releaseYear)
+
+barp1 <- barplot(releaseYears, 
+                 ylab = list("Cantidad", cex = 1.2), 
+                 xlab = list("Años", cex = 1.2),
+      col = releaseYears, ylim = c(0,350), space = 0 , width = c(rep(15, times = 35)), las = 2 )
+
+title(main = 'Fig. \n Año de Realización',
+      sub = 'Exploración de datos',
+      col.main = 'Black', 
+      col.sub = 'blue',
+      font = 2)
+text(barp1,releaseYears+12, labels = releaseYears)
+grid(col = "lightgray",nx = 0,ny = 14)
+
+
+```
+
+Se toman la cantidad de cintas fueron realizadas por cada uno de los
+años, desde 1940 hasta el año 2017.
+
+### Top 5 de años con mayor publicación
+
+```{r M4, include=T, echo=T, echo=F,message=F, warning=F, comment=""}
+# Ratings
+releaseYear_Ordered <- data.frame (DB %>%
+                  select(release.year) )
+
+releaseYear_Ordered1 <- data.frame(table(releaseYear_Ordered))
+releaseYear_Ordered1 <- releaseYear_Ordered1 %>%
+                        arrange(desc(releaseYear_Ordered1$Freq))
+
+releaseYear_TOP5 <- head(releaseYear_Ordered1, n = 5)
+releaseYear_TOP5
+```
+
+```{r M5, include=T, echo=T, echo=F,message=F, fig.align='center', fig.height=10, fig.width=16, warning=F, comment=""}
+# Top 5
+ggplot(releaseYear_TOP5, 
+       aes(x="", 
+           y=Freq, 
+           fill=releaseYear_Ordered)) +
+  geom_bar(stat="identity", width=1, color = "white") +
+  geom_label(aes(label = Freq),
+           position = position_stack(vjust = 0.5),
+           show.legend = FALSE,
+           size = 10)+
+  coord_polar("y", start=0)+
+  theme_void()+
+  theme(legend.position = "bottom",
+        text = element_text(size = 40))+
+  guides(fill=guide_legend(title="Año de lanzamiento"))
+```
+
+El año que predomina en esta lista de elementos con mayor cantidad de
+cintas, es el año 2016.
+
+## Rating Description
+
+La tercera categoría observada es el rating description.
+
+```{r M6, include=T, echo=T, echo=F,message=F, fig.align='center', fig.height=8, fig.width=16, warning=F, comment=""}
+#Release Year
+ratingDescription <- DB %>%
+                  select(ratingDescription)
+
+ratingDescription <- data.frame(table(ratingDescription))
+ratingDescription
+
+p<-ggplot(data=ratingDescription, 
+          aes(x=ratingDescription, 
+              y=Freq,
+              fill = ratingDescription)) +
+  geom_bar(stat="identity")+
+  geom_text(aes(label=Freq), vjust=-0.3, size=5)+
+  theme_minimal()+ 
+  theme(legend.position="bottom",
+        text = element_text(size = 30))
+p
+```
+
+La moda en la categoría de rating description, se aprecia que es 90
+entre las 1000 muestras.
+
+### Histograma + densidad
+
+```{r M7, include=T, echo=T, echo=F,message=F, fig.align='center', fig.height=8, fig.width=16, warning=F, comment=""}
+p1 <- ggplot(DB,
+             aes(ratingDescription))
+p1 + geom_histogram(aes(y = ..density..),
+                 colour = 1, fill = "white")+
+  geom_density(lwd = 1.2,
+               linetype = 2,
+               colour = 2,
+               fill = 4,
+               alpha = 0.25)
+```
+
+### Diagrama de Violin
+
+```{r M8, include=T, echo=T, echo=F,message=F, fig.align='center', fig.height=8, fig.width=16, warning=F, comment=""}
+vioplot(DB$ratingDescription, horizontal = T)
+stripchart(DB$ratingDescription, 
+           method = "jitter", 
+           col = "blue",
+           vertical = F, 
+           pch = 19, 
+           add = TRUE)
+```
+
+## Title
+
+Vamos a analizar cuales fueron los títulos con mayor puntaje por el
+usuario.
+
+```{r M9, include=T, echo=T, echo=F,message=F, fig.align='center', fig.height=8, fig.width=16, warning=F, comment=""}
+#Title
+varios <- select(DB,
+                 title, 
+                 rating, 
+                 user.rating.score,
+                 release.year)
+
+varios <- data.frame((varios))
+varios <- arrange(.data = varios,
+                   desc(user.rating.score))
+
+varios <- group_by(varios, title)%>% 
+          filter (! duplicated(title))
+
+titulosTop <- head(varios, n = 10)
+titulosTop
+```
+
+Top 1:
+
+![](https://www.cinemascomics.com/wp-content/uploads/2017/04/13-razones-por-ver-13-reasons-why-Netflix-2.jpg?width=1200&enable=upscale "13 Reason Why")
+
+Top 2:
+
+![](https://images-na.ssl-images-amazon.com/images/I/91cdauekEiL._RI_.jpg)
+
+Top 3:
+
+![](https://images-na.ssl-images-amazon.com/images/S/pv-target-images/5275fb8c123c73a914f2cbcdd7365690f099cf46eb22ce30fee32d9b2c37eaae._UY500_UX667_RI_V_TTW_.jpg)

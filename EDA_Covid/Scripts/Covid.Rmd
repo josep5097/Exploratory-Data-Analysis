@@ -1,0 +1,374 @@
+---
+title: "Covid Casos"
+author: "Ing. José Miguel Pereira"
+date: "23/1/2022"
+output: word_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# Casos Covid
+
+En el presente proyecto se realiza la visualización de los casos de
+COVID-19 y sus variante por paises.
+
+La data contiene la siguiente información:
+
+-   Localización (location): País.
+
+-   Fecha (date): Fecha a la entrada de la información.
+
+-   Variante (variant) : Variante correspondiente.
+
+-   Numero de secuencia (num_sequences): número de secuencia
+    correspondiente (por país, variante y fecha).
+
+-   Porcentaje de secuencia (perc_sequences): Porcentaje de secuencias
+    del número total de secuencias (para el país, la variante y fecha).
+
+-   Número de secuencias totales (numsequencestotal): Número total de
+    secuencias (para el país, la variante y la fecha).
+
+Cita:
+
+Yam Peleg, "Omicron daily cases by country (COVID-19 variant)." Kaggle,
+2022, doi: 10.34740/KAGGLE/DSV/3085368.
+
+# Tabla de contenido
+
+1.  Librerías
+
+2.  Data
+
+3.  Manipulación de datos y resumen
+
+4.  Casos de variantes por país
+
+5.  Casos por fecha
+
+6.  Percepción de las variables de COVID-19 en los paises.
+
+7.  Variable Omicron
+
+# 1. Librerías
+
+Se procede a importar las librerías a emplear para el procesamiento y
+visualización de los datos.
+
+```{r Librerias, include=T,message=F, warning=F, comment=""}
+# Librerias 
+library(dplyr)
+library(lubridate)
+library(reshape2)
+library(openxlsx)
+# Gráficos
+library(ggplot2)
+library(gganimate)
+library(plotly)
+# Gráficos de correlación
+library(corrplot)
+# Resumen personalizado
+library(gtsummary)
+library(DataExplorer)
+# cluster result visualization with network diagram
+library(igraph)
+library(vioplot)
+library(treemapify)
+```
+
+# 2. Data
+
+Con las librerias cargadas, se procede a cargar la base de datos.
+
+```{r Base_De_Datos1, include = T, echo=F,message=F, warning=F, comment=""}
+# Data ====
+DB <- read.csv("C:\\Users/Jose/Documents/R/Projectos/Project_Covid/Data/covid-variants.csv",
+               header = T,
+               stringsAsFactors = F)
+head(DB)
+```
+
+```{r Base_De_Datos2, include = T, echo=F,message=F, warning=F, comment=""}
+# Data ====
+region <- read.xlsx("C:\\Users/Jose/Documents/R/Projectos/Project_Covid/Data/continentes.xlsx",
+                    detectDates = F)
+```
+
+# 3. Manipulación de datos y resumen
+
+Vamos a observar si existen datos nulos
+
+```{r Resumen1, echo=F,message=F, warning=F, comment=""}
+apply(X = is.na(DB), MARGIN = 2, FUN = sum)
+sum(is.na(DB))
+```
+
+Se observa que no existen datos faltantes.
+
+```{r Resumen2, echo=F,message=F, warning=F, comment=""}
+str(DB)
+```
+
+Se observa que la fecha no se encuentra en formato. Toca cambiarla.
+
+```{r Resumen3, echo=F,message=F, warning=F, comment=""}
+DB <- mutate(DB,
+             date = as.Date(date,format = "%Y-%m-%d"))
+str(DB)
+
+```
+
+Los datos se encuentran correctos.
+
+Vamos a observar cuantas observaciones de variantes se poseen.
+
+```{r Resumen4, echo=F,message=F, warning=F, comment=""}
+# Empleando dplyr
+resumen <- count(DB, variant, sort = T)
+resumen
+```
+
+```{r Resumen5, echo=F,message=F, warning=F, comment="",fig.align='center', fig.height=12, fig.width=16}
+# DataExplorer
+plot_str(DB)
+```
+
+```{r Resumen6, echo=F,message=F, warning=F, comment="",fig.align='center', fig.height=12, fig.width=16}
+# DataExplorer
+plot_intro(introduce(DB))
+```
+
+```{r Resumen7, echo=F,message=F, warning=F, comment="",fig.align='center', fig.height=12, fig.width=16}
+# DataExplorer
+plot_missing((DB))
+```
+
+```{r Resumen8, echo=F,message=F, warning=F, comment="",fig.align='center', fig.height=8, fig.width=16}
+# DataExplorer
+plot_correlation(na.omit(DB), maxcat = 5L)
+```
+
+```{r Resumen9, echo=F,message=F, warning=F, comment="",fig.align='center'}
+
+muestra <- select(DB,
+                  location,
+                  num_sequences_total)
+muestra <- group_by(muestra,
+                    location) %>%
+           summarise(num_sequences_total = sum(num_sequences_total))
+```
+
+```{r Resumen10, echo=F,message=F, warning=F, comment="",fig.align='center', fig.height=14, fig.width=16}
+
+g1 <-ggplot(muestra, 
+       aes(area = num_sequences_total, 
+           fill = location, 
+           label = num_sequences_total)) +
+  geom_treemap() +
+  theme(legend.position = "none") +
+  geom_treemap_text(aes(label = location), 
+                    place = "centre",
+                    colour = "white",
+                    grow = T)
+g1
+```
+
+Se logra apreciar en la ilustración anterior como se encuentran los
+casos según los paises.
+
+# 4. Casos de variantes por pais.
+
+Se procede a mostrar la incidencia de las variables de COVID-19 en los
+paises.
+
+Para lo cual, se realizará una gráfica de los 10 paises con mayor número
+de casos por cada una de estas cepas.
+
+```{r casos_variantes1, echo=T,message=F, warning=F, comment="",fig.align='center', fig.height=12, fig.width=16}
+
+virus <- unique(DB$variant)
+for (i_virus in virus){
+  data_nueva<-group_by(DB[which(DB$variant == i_virus),], 
+                       location) %>%
+              summarise(num_sequences = sum(num_sequences)) 
+  
+  data_nueva <- arrange(data_nueva, desc(data_nueva$num_sequences))
+  data_nueva <- data.frame(head(data_nueva,n=10))
+  
+  # Grafico
+  print(
+    ggplot(data=data_nueva, 
+           aes(x = num_sequences, 
+               y = reorder(location, num_sequences))) +
+    geom_bar(stat="identity")+ 
+    ggtitle(paste("Fig. \nTOP 10 de paises con mayor número de casos de",i_virus))+
+    xlab("Número de casos")+
+    ylab("Locación"))
+}
+```
+
+# 5. Casos por fecha
+
+```{r casos_variantes2, echo=T,message=F, warning=F, comment="",fig.align='center', fig.height=12, fig.width=16}
+
+virus <- unique(DB$variant)
+for (i_virus in virus){
+  data_nueva1 <- 
+              group_by(DB[which(DB$variant == i_virus),],date) %>%
+              summarise(num_sequences = sum(num_sequences))
+  
+  # Grafico
+  print(
+    ggplot(data=data_nueva1, 
+           aes(x = date, 
+               y = num_sequences)) +
+    geom_area(alpha = 0.6,
+              size = 1,
+              color = "black")+ 
+    ggtitle(paste("Fig. \nNúmero de casos por fecha de",i_virus))+
+    xlab("Fecha")+
+    ylab("Casos"))
+}
+```
+
+```{r casos_variantes3, echo=T,message=F, warning=F, comment="",fig.align='center', fig.height=12, fig.width=16}
+
+virus <- unique(DB$variant)
+for (i_virus in virus){
+  data_nueva1 <- 
+              group_by(DB[which(DB$variant == i_virus),],date)  %>%
+              summarise(num_sequences = sum(num_sequences)) %>%
+    mutate(num_sequences = cumsum(num_sequences))
+  
+  # Grafico
+  print(
+   ggplot(data=data_nueva1, 
+           aes(x = date,
+               y = num_sequences)) +
+    geom_area(aes(y = num_sequences),
+              alpha = 0.6,
+              size = 1,
+              color = "black")+ 
+    ggtitle(paste("Fig. \nNúmero de casos acumulativos por fecha de la variable",i_virus))+
+    xlab("Fecha")+
+    ylab("Casos"))
+   }
+```
+
+Para poder visualizar los casos por las fechas, se realizó el gráfico
+interactivo.
+
+```{r casos_variantes3_HTML,include=FALSE, echo=T,message=F, warning=F, comment="",fig.align='center', fig.height=12, fig.width=16}
+
+virus <- unique(DB$variant)
+for (i_virus in virus){
+  data_nueva1 <- 
+              group_by(DB[which(DB$variant == i_virus),],date)  %>%
+              summarise(num_sequences = sum(num_sequences)) %>%
+    mutate(num_sequences = cumsum(num_sequences))
+  
+  
+  Melt_Datos <- melt(data_nueva1,id.vars = "date")
+
+
+g <- ggplot(Melt_Datos,
+            aes(x=date,
+                y=value,
+                group=variable))+
+    geom_area(aes(color=variable,
+                  fill=variable),
+              alpha=0.2)+
+    theme(legend.position = "bottom")+
+    theme_minimal()+ 
+    ggtitle(paste("Fig. \nNúmero de casos acumulativos por fecha de la variable",i_virus))+
+    xlab("Fecha")+
+    ylab("Casos")
+
+# Usando el graficador ggplotly
+  print(ggplotly(g))
+}
+```
+
+# 6. Percepción de las variables de COVID-19 en los paises
+
+```{r percep, echo=T,message=F, warning=F, comment=""}
+
+data.nueva2 <- DB[c('location','variant','num_sequences')]
+data.nueva2 <- group_by(.data = data.nueva2, 
+                        location)
+
+temp.1 <- group_by(data.nueva2, location) %>% 
+          summarise( num_sequences= sum(num_sequences))
+temp.2 <- group_by(data.nueva2, 
+                   location,
+                   variant) %>% 
+          summarise( num_sequences= sum(num_sequences))
+paises <- unique(DB$location)
+nueva.data <- temp.2[1,]
+nueva.data <- nueva.data[-1,]
+for (pais in paises) {
+  temp.3 <- group_by(temp.2[which(temp.2$location == pais),],location)  
+  val <- group_by(temp.1[which(temp.1$location == pais),],location)
+  temp.3$num_sequences <- temp.3$num_sequences /val$num_sequences
+  
+  # Modificar el data frame
+  nueva.data <- rbind(nueva.data,temp.3) 
+}
+```
+
+```{r percep1, echo=T,message=F, warning=F, comment="",fig.align='center', fig.height=20, fig.width=16}
+# Grafica de plot acumulada
+ggplot(data = nueva.data, 
+       aes(x = location, 
+           fill = variant,
+           y = num_sequences)) +
+       geom_bar(stat = "identity")+ 
+  labs(title = "Percepción de las cepas en los paises",
+       subtitle = "Relación entre 0 y 1",
+       x = "Paises",
+       y = "Porcentaje",
+       fill = 'Variantes')+
+  theme(plot.title=element_text(family='Anton', size=10),
+        text = element_text(size=10),
+        axis.text.x = element_text(angle = 90, 
+                                   vjust = 0.5, 
+                                   hjust=1,
+                                   size = 7),
+        legend.title=element_text(family='Anton', face='bold', size=14, color='black', hjust=0.5),
+        legend.position = 'bottom',
+        legend.key.size = unit(0.5, units = "cm"),
+        legend.box.background = element_rect())
+```
+
+# 7. Variable Omicron
+
+Omicron siendo la última variable de COVID-19 se analiza su incidencia
+en los paises.
+
+```{r omicron, echo=T,message=F, warning=F, comment="",fig.align='center', fig.height=12, fig.width=16}
+
+data.nueva3 <- DB[c('location','variant','num_sequences')]
+data.nueva3 <- filter(data.nueva3, 
+                      data.nueva3$variant == "Omicron")
+
+temp.1 <- group_by(data.nueva3, location) %>% 
+          summarise( num_sequences= sum(num_sequences))
+temp.1 <- filter(temp.1,
+                 num_sequences > 0)
+temp.1 <- arrange(temp.1, desc(num_sequences))
+# Grafica de barra
+ggplot(data=temp.1, 
+           aes(x = num_sequences, 
+               y = reorder(location, num_sequences))) +
+    geom_bar(stat="identity")+ 
+    ggtitle("Fig. \nPaises con casos de Omicron")+
+    xlab("Número de casos")+
+    ylab("Locación")
+```
+
+Se logra apreciar en la figura anterior, los paises que poseen al menos
+1 caso de Omicron.
+
+El país con mayor incidencia de la variante Omicron es United Kingdom,
+seguido de Estados Unidos, Dinamarca, Alemanía y Sudáfrica.
